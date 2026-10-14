@@ -73,9 +73,6 @@ main{max-width:640px;margin:0 auto;padding:0 16px 120px}
 .par label{display:block;font-size:15px;color:var(--gris);margin-bottom:5px;font-weight:500}
 .codigo{width:100%;height:56px;border:2px solid var(--linea);border-radius:6px;background:var(--papel);padding:0 12px;font-family:var(--cond);font-weight:600;font-size:24px}
 .codigo:focus{border-color:var(--asfalto);outline:none;box-shadow:0 0 0 3px var(--senal)}
-.tableros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.tablero{min-height:58px;text-align:left;padding:10px 12px;background:var(--papel);border:2px solid var(--linea);border-radius:6px;font-weight:500;font-size:16px;line-height:1.2}
-.tablero[aria-pressed="true"]{background:var(--senal);border-color:var(--asfalto);font-weight:600}
 .dos{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--asfalto);border-radius:6px;overflow:hidden}
 .dos button{height:58px;border:0;background:var(--papel);font-weight:600;font-size:17px}
 .dos button+button{border-left:2px solid var(--asfalto)}
@@ -87,6 +84,7 @@ summary::-webkit-details-marker{display:none}
 summary::after{content:"+";font-family:var(--cond);font-size:26px;line-height:1;color:var(--gris)}
 details[open] summary::after{content:"−"}
 .detalle-cuerpo{padding-bottom:18px}
+.novedad{min-height:110px;font-size:18px}
 textarea{width:100%;min-height:96px;border:2px solid var(--linea);border-radius:6px;padding:12px;background:var(--papel);resize:vertical;font-size:17px}
 textarea:focus{border-color:var(--asfalto);outline:none;box-shadow:0 0 0 3px var(--senal)}
 .foto-btn{display:flex;align-items:center;gap:10px;margin-top:10px;height:54px;padding:0 14px;border:2px dashed var(--linea);border-radius:6px;background:var(--papel);font-weight:500;width:100%}
@@ -212,8 +210,8 @@ textarea:focus{border-color:var(--asfalto);outline:none;box-shadow:0 0 0 3px var
       </div>
 
       <div class="bloque">
-        <h2 id="tFalla">¿Qué falla tiene?</h2>
-        <div class="tableros" id="fallas" role="group" aria-labelledby="tFalla"></div>
+        <h2><label for="descripcion">Novedad</label></h2>
+        <textarea id="descripcion" class="novedad" maxlength="400" placeholder="Ej: Sale desde Portal porque presenta problemas en la puerta 2"></textarea>
       </div>
 
       <div class="bloque">
@@ -225,10 +223,9 @@ textarea:focus{border-color:var(--asfalto);outline:none;box-shadow:0 0 0 3px var
       </div>
 
       <details id="masDetalle">
-        <summary>Agregar detalle o foto</summary>
+        <summary>Agregar foto</summary>
         <div class="detalle-cuerpo">
-          <textarea id="descripcion" maxlength="1000" aria-label="Detalle de la falla" placeholder="Qué pasó, ruidos, luces encendidas en el tablero…"></textarea>
-          <label class="foto-btn" for="foto">
+          <label class="foto-btn" for="foto" style="margin-top:0">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E2328" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>
             <span id="fotoTexto">Tomar o adjuntar foto</span>
           </label>
@@ -238,7 +235,7 @@ textarea:focus{border-color:var(--asfalto);outline:none;box-shadow:0 0 0 3px var
         </div>
       </details>
     </main>
-    <div class="pie"><button id="btnEnviar">Reportar falla</button></div>
+    <div class="pie"><button id="btnEnviar">Reportar novedad</button></div>
   </div>
 
   <!-- ---------- Confirmación ---------- -->
@@ -280,9 +277,6 @@ const CONFIG = {
   INDICATIVO: '57',
   MAPA_CENTRO: [10.3910, -75.4794]               // Cartagena
 };
-const FALLAS_DEFECTO = ['Motor','Frenos','Eléctrico / batería','Llantas','Aire acondicionado','Puertas',
-  'Suspensión','Dirección','Caja / embrague','Fuga de aceite, agua o aire','Recalentamiento',
-  'Carrocería / vidrios','Choque','Otra'];
 
 /* ===================================================================== */
 const $ = id => document.getElementById(id);
@@ -300,7 +294,7 @@ const primerNombre = n => String(n || '').split(' ')[0];
 
 let sesion = LS.get('sesion', null);
 let opPendiente = null;
-const estado = { falla: null, detenido: null, pos: null, gps: null, manual: false, foto: null };
+const estado = { detenido: null, pos: null, gps: null, manual: false, foto: null };
 let mapa = null, marcador = null, circulo = null, watchId = null, centrado = false, enviandoCola = false;
 
 async function api(params) {
@@ -465,13 +459,6 @@ function pintarListas(l) {
   const ops = arr => (arr || []).map(v => Object.assign(document.createElement('option'), { value: v }));
   $('lstVehiculos').replaceChildren(...ops(l.vehiculos));
   $('lstRutas').replaceChildren(...ops(l.rutas));
-  const fallas = l.fallas && l.fallas.length ? l.fallas : FALLAS_DEFECTO;
-  $('fallas').replaceChildren(...fallas.map(f => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'tablero'; b.textContent = f; b.dataset.v = f;
-    b.setAttribute('aria-pressed', estado.falla === f ? 'true' : 'false');
-    return b;
-  }));
 }
 async function cargarListas() {
   pintarListas(LS.get('listas', {}));
@@ -482,12 +469,7 @@ async function cargarListas() {
   } catch (e) {}
 }
 function marcar(grupo, b) { [...$(grupo).children].forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); }
-const esOtra = f => /^otr[ao]s?$/i.test(String(f || '').trim());
-$('fallas').addEventListener('click', e => {
-  const b = e.target.closest('.tablero'); if (!b) return;
-  estado.falla = b.dataset.v; marcar('fallas', b); vibrar(15); quitarAviso();
-  if (esOtra(estado.falla)) { $('masDetalle').open = true; }
-});
+
 $('detenido').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   estado.detenido = b.dataset.v; marcar('detenido', b); vibrar(15); quitarAviso();
@@ -676,9 +658,8 @@ async function enviar() {
   if (!estado.pos) falta.push('la ubicación (espere el GPS o toque el mapa)');
   if (!veh) falta.push('el vehículo');
   if (!ruta) falta.push('la ruta');
-  if (!estado.falla) falta.push('qué falla tiene');
+  if (!desc) falta.push('la novedad (qué le pasa al vehículo)');
   if (!estado.detenido) falta.push('si quedó detenido');
-  if (esOtra(estado.falla) && !desc) { falta.push('el detalle de la falla'); $('masDetalle').open = true; }
   if (falta.length) { aviso('Falta ' + falta.join(', ') + '.', 'err'); vibrar([40, 60, 40]); $('msg').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
 
   LS.set('ultimo', { vehiculo: veh, ruta });
@@ -687,7 +668,7 @@ async function enviar() {
     id: generarId(), fechaHoraISO: d.toISOString(),
     fecha: `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`, hora: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
     cedula: sesion.cedula, nombre: sesion.nombre, celular: sesion.celular,
-    vehiculo: veh, ruta, falla: estado.falla, detenido: estado.detenido, descripcion: desc,
+    vehiculo: veh, ruta, detenido: estado.detenido, descripcion: desc,
     lat: num(estado.pos.lat, 6), lng: num(estado.pos.lng, 6),
     precision: estado.manual ? null : num(estado.gps && estado.gps.precision, 0), manual: estado.manual,
     foto: estado.foto, dispositivo: navigator.userAgent.slice(0, 200),
@@ -695,7 +676,7 @@ async function enviar() {
   };
   const b = $('btnEnviar'); b.disabled = true; b.textContent = 'Enviando…';
   const r = await subir(rep);
-  b.disabled = false; b.textContent = 'Reportar falla';
+  b.disabled = false; b.textContent = 'Reportar novedad';
   if (r.codigo === 'NO_AUTORIZADO') { LS.del('sesion'); sesion = null; mostrarIngreso(); errorIngreso('errIngreso', 'Su usuario no está autorizado. Comuníquese con mantenimiento.'); return; }
   if (r.ok) { rep.fotoUrl = r.foto || ''; guardarPropio(rep, true); mostrarListo(rep, true); }
   else { encolar(rep); guardarPropio(rep, false); mostrarListo(rep, false); }
@@ -706,7 +687,7 @@ $('btnEnviar').addEventListener('click', enviar);
 
 function guardarPropio(rep, enviado) { // historial local, por si no hay señal al consultar
   const h = LS.get('propios', []).filter(x => x.id !== rep.id);
-  h.unshift({ id: rep.id, fecha: rep.fecha, hora: rep.hora, vehiculo: rep.vehiculo, falla: rep.falla, enviado });
+  h.unshift({ id: rep.id, fecha: rep.fecha, hora: rep.hora, vehiculo: rep.vehiculo, novedad: rep.descripcion, enviado });
   LS.set('propios', h.slice(0, 15));
 }
 
@@ -739,24 +720,16 @@ addEventListener('online', procesarCola);
 setInterval(procesarCola, 60000);
 
 /* ---------- WhatsApp ---------- */
+/* Mensaje corto, estilo radio:
+   TC33037 RUTA T101 EN PATIO PORTAL PRESENTA PROBLEMAS EN LA PUERTA 2 OP CARLOS CORBY
+   https://maps.google.com/?q=10.39502,-75.47237 */
+const MAY = t => String(t || '').toLocaleUpperCase('es-CO').replace(/\s+/g, ' ').trim();
 function textoWhatsApp(r) {
-  return [
-    `*Falla en vía – Vehículo ${r.vehiculo}*`,
-    `Ruta: ${r.ruta}`,
-    `Falla: *${r.falla}*`,
-    `Detenido: *${r.detenido}*`,
-    r.descripcion ? `Detalle: ${r.descripcion}` : null,
-    ``,
-    `Operador: ${r.nombre}`,
-    `Celular: ${celBonito(r.celular)}`,
-    `Fecha: ${r.fecha}  ${r.hora}`,
-    ``,
-    r.paraderoCodigo ? `Cerca de: *${r.paraderoCodigo} ${r.paraderoNombre}*` + (r.paraderoRuta && normRuta(r.paraderoRuta) !== normRuta(r.ruta) ? ` (ruta ${r.paraderoRuta})` : '') + ` – ${r.paraderoSentido}, a ${metros(r.paraderoDist)}` : null,
-    `Ubicación: https://maps.google.com/?q=${r.lat},${r.lng}`,
-    `Latitud: ${r.lat}  Longitud: ${r.lng}` + (r.manual ? ' (marcado a mano)' : (r.precision != null ? ` (±${r.precision} m)` : '')),
-    r.fotoUrl ? `Foto: ${r.fotoUrl}` : null,
-    `Reporte ${r.id}`
-  ].filter(x => x !== null).join('\n');
+  const nov = MAY(r.descripcion).replace(/[.\s]+$/, '');
+  const donde = r.paraderoNombre ? `EN ${MAY(r.paraderoNombre)}` : '';
+  const linea = [MAY(r.vehiculo), r.ruta ? `RUTA ${MAY(r.ruta)}` : '', donde, nov, `OP ${MAY(r.nombre)}`].filter(Boolean).join(' ');
+  const lat = Number(r.lat).toFixed(5), lng = Number(r.lng).toFixed(5);
+  return `${linea}\nhttps://maps.google.com/?q=${lat},${lng}`;
 }
 function abrirWhatsApp(r) {
   const t = encodeURIComponent(textoWhatsApp(r));
@@ -771,7 +744,7 @@ function mostrarListo(r, enviado) {
   $('listoSub').textContent = enviado ? 'Mantenimiento ya lo tiene. Avise también por WhatsApp.'
                                       : 'Se envía solo cuando vuelva la señal. Avise por WhatsApp si puede.';
   $('listoVeh').textContent = r.vehiculo;
-  const filas = [['Ruta', r.ruta], ['Falla', r.falla], ['Detenido', r.detenido], ['Hora', `${r.fecha} ${r.hora}`],
+  const filas = [['Ruta', r.ruta], ['Novedad', r.descripcion], ['Detenido', r.detenido], ['Hora', `${r.fecha} ${r.hora}`],
                  ...(r.paraderoCodigo ? [['Paradero', `${r.paraderoCodigo} ${r.paraderoNombre} (${r.paraderoSentido}), a ${metros(r.paraderoDist)}`]] : []),
                  ['Ubicación', `${r.lat}, ${r.lng}`], ['Foto', r.foto ? 'Adjunta' : 'Sin foto']];
   $('listoDatos').replaceChildren(...filas.map(([k, v]) => {
@@ -784,7 +757,7 @@ function mostrarListo(r, enviado) {
   verVista('vistaListo'); pintarCola();
 }
 $('btnNuevo').addEventListener('click', () => {
-  estado.falla = null; estado.detenido = null;
+  estado.detenido = null;
   document.querySelectorAll('[aria-pressed="true"]').forEach(x => x.setAttribute('aria-pressed', 'false'));
   $('descripcion').value = ''; limpiarFoto(); $('masDetalle').open = false;
   par.manual = false; par.ultimo = null;
@@ -798,16 +771,17 @@ function filaLista(t, sub, estadoTxt, clase) {
   li.append(izq, Object.assign(document.createElement('span'), { className: 'sello ' + clase, textContent: estadoTxt }));
   return li;
 }
+const resumen = t => { t = String(t || '').trim(); return t.length > 60 ? t.slice(0, 57) + '…' : t; };
 async function verHistorial() {
   verVista('vistaHist');
   const ul = $('lista');
   const pintar = remotos => {
     const items = [];
-    LS.get('cola', []).forEach(r => items.push(filaLista(`${r.vehiculo}, ${r.falla}`,`${r.fecha} ${r.hora}`, 'Sin enviar', 'PEND')));
+    LS.get('cola', []).forEach(r => items.push(filaLista(`${r.vehiculo}, ${resumen(r.descripcion)}`,`${r.fecha} ${r.hora}`, 'Sin enviar', 'PEND')));
     (remotos || []).forEach(r => {
       const est = (r.estado || 'ABIERTO').toUpperCase();
       const txt = est === 'EN ATENCIÓN' ? 'En atención' : est === 'CERRADO' ? 'Atendido' : 'Abierto';
-      items.push(filaLista(`${r.vehiculo}, ${r.falla}`, `${r.fecha} ${r.hora}`.trim() + (r.paradero ? `. Cerca de ${r.paradero}` : '') + (r.responsable ? `. Atiende: ${r.responsable}` : ''), txt, est.split(' ')[0]));
+      items.push(filaLista(`${r.vehiculo}, ${resumen(r.novedad || r.falla)}`, `${r.fecha} ${r.hora}`.trim() + (r.paradero ? `. Cerca de ${r.paradero}` : '') + (r.responsable ? `. Atiende: ${r.responsable}` : ''), txt, est.split(' ')[0]));
     });
     if (!items.length) items.push(Object.assign(document.createElement('li'), { className: 'vacio', textContent: 'Aún no ha reportado fallas desde este celular.' }));
     ul.replaceChildren(...items);
