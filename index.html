@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1E2328">
+<title>Fallas en vía</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+:root{
+  --asfalto:#1E2328; --asfalto-2:#2E353D; --fondo:#ECEEF0; --papel:#FFFFFF;
+  --linea:#C5CBD1; --tinta:#1E2328; --gris:#59616A;
+  --senal:#F2B705; --senal-press:#D9A300; --alto:#B80F2A; --ok:#17703F; --wa:#157A3F;
+  --cond:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --base:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--base);font-size:17px;line-height:1.4;color:var(--tinta);background:var(--fondo);-webkit-tap-highlight-color:transparent}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--senal);outline-offset:2px}
+[hidden]{display:none!important}
+h1,h2{font-family:var(--cond);font-weight:700;letter-spacing:.005em;margin:0}
+
+/* ---------- Ingreso ---------- */
+#ingreso{min-height:100vh;min-height:100dvh;background:var(--asfalto);color:#fff;display:flex;flex-direction:column;padding:28px 20px calc(24px + env(safe-area-inset-bottom))}
+.marca{display:flex;align-items:center;gap:10px;font-family:var(--cond);font-weight:600;font-size:17px;color:#C9CFD6}
+.marca svg{flex:none}
+.ingreso-cuerpo{margin:auto 0;max-width:420px;width:100%;align-self:center}
+#ingreso h1{font-size:34px;line-height:1.05;margin-bottom:8px}
+#ingreso p{color:#BFC6CE;margin:0 0 22px}
+.campo-grande{width:100%;height:68px;border:2px solid #59626C;background:var(--asfalto-2);border-radius:6px;padding:0 16px;color:#fff;font-family:var(--cond);font-weight:600;font-size:30px;letter-spacing:.06em}
+.campo-grande::placeholder{color:#7B848E;letter-spacing:0;font-size:22px}
+.campo-grande:focus{border-color:var(--senal);outline:none}
+.btn-senal{display:block;width:100%;height:60px;margin-top:14px;border:0;border-radius:6px;background:var(--senal);color:var(--asfalto);font-family:var(--cond);font-weight:700;font-size:22px}
+.btn-senal:active{background:var(--senal-press)}
+.btn-senal:disabled{opacity:.6}
+.nota{font-size:14px;color:#9AA3AD;margin-top:14px}
+.error-ingreso{background:#3A1D22;border-left:4px solid #F0566E;color:#FFD5DB;padding:10px 12px;border-radius:4px;margin-top:14px;font-size:15px}
+.enlace-claro{background:none;border:0;color:#C9CFD6;text-decoration:underline;padding:12px 0;font-size:15px}
+
+/* ---------- Barra superior ---------- */
+.barra{position:sticky;top:0;z-index:1001;background:var(--asfalto);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top))}
+.quien{min-width:0}
+.quien strong{display:block;font-family:var(--cond);font-weight:600;font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quien span{font-size:13px;color:#A9B1BA}
+.btn-barra{flex:none;background:none;border:1.5px solid #59626C;color:#fff;border-radius:6px;padding:8px 12px;font-size:15px;font-weight:500}
+
+/* ---------- Mapa ---------- */
+.mapa-caja{position:relative}
+#mapa{height:40vh;min-height:220px;max-height:360px;background:#D5DADF}
+.gps-chip{position:absolute;left:12px;bottom:12px;z-index:500;background:var(--papel);border:2px solid var(--asfalto);border-radius:6px;padding:6px 10px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px}
+.gps-chip i{width:10px;height:10px;border-radius:50%;background:#9AA3AD;flex:none}
+.gps-chip.bien i{background:var(--ok)} .gps-chip.regular i{background:var(--senal)} .gps-chip.mal i{background:var(--alto)}
+.btn-centrar{position:absolute;right:12px;bottom:12px;z-index:500;width:46px;height:46px;border-radius:6px;background:var(--papel);border:2px solid var(--asfalto);display:grid;place-items:center;padding:0}
+.franja{background:var(--papel);border-bottom:1px solid var(--linea);padding:9px 16px;display:flex;justify-content:space-between;gap:10px;font-size:14px;color:var(--gris)}
+.franja b{color:var(--tinta);font-weight:600;font-variant-numeric:tabular-nums}
+.pin{width:26px;height:26px;background:var(--senal);border:3px solid var(--asfalto);border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 0 rgba(30,35,40,.35)}
+.pin::after{content:"";position:absolute;width:8px;height:8px;background:var(--asfalto);border-radius:50%;left:6px;top:6px}
+
+/* ---------- Formulario ---------- */
+main{max-width:640px;margin:0 auto;padding:0 16px 120px}
+.bloque{padding-top:22px}
+.bloque h2{font-size:21px;margin-bottom:10px}
+.aviso{margin:14px 0 0;padding:11px 13px;border-left:4px solid;border-radius:4px;font-size:15px}
+.aviso.err{background:#FBE6E9;border-color:var(--alto);color:#7A0A1C}
+.aviso.info{background:#FFF3C8;border-color:var(--senal-press);color:#5B4500}
+.par{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.par label{display:block;font-size:15px;color:var(--gris);margin-bottom:5px;font-weight:500}
+.codigo{width:100%;height:56px;border:2px solid var(--linea);border-radius:6px;background:var(--papel);padding:0 12px;font-family:var(--cond);font-weight:600;font-size:24px}
+.codigo:focus{border-color:var(--asfalto);outline:none;box-shadow:0 0 0 3px var(--senal)}
+.tableros{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tablero{min-height:58px;text-align:left;padding:10px 12px;background:var(--papel);border:2px solid var(--linea);border-radius:6px;font-weight:500;font-size:16px;line-height:1.2}
+.tablero[aria-pressed="true"]{background:var(--senal);border-color:var(--asfalto);font-weight:600}
+.dos{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--asfalto);border-radius:6px;overflow:hidden}
+.dos button{height:58px;border:0;background:var(--papel);font-weight:600;font-size:17px}
+.dos button+button{border-left:2px solid var(--asfalto)}
+.dos button[data-v="SÍ"][aria-pressed="true"]{background:var(--alto);color:#fff}
+.dos button[data-v="NO"][aria-pressed="true"]{background:var(--asfalto);color:#fff}
+details{margin-top:22px;border-top:1px solid var(--linea);border-bottom:1px solid var(--linea)}
+summary{list-style:none;padding:16px 0;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--cond);font-size:26px;line-height:1;color:var(--gris)}
+details[open] summary::after{content:"−"}
+.detalle-cuerpo{padding-bottom:18px}
+textarea{width:100%;min-height:96px;border:2px solid var(--linea);border-radius:6px;padding:12px;background:var(--papel);resize:vertical;font-size:17px}
+textarea:focus{border-color:var(--asfalto);outline:none;box-shadow:0 0 0 3px var(--senal)}
+.foto-btn{display:flex;align-items:center;gap:10px;margin-top:10px;height:54px;padding:0 14px;border:2px dashed var(--linea);border-radius:6px;background:var(--papel);font-weight:500;width:100%}
+#foto{position:absolute;width:1px;height:1px;opacity:0}
+#preview{display:block;max-width:100%;max-height:240px;border-radius:6px;margin-top:10px}
+.quitar{background:none;border:0;color:var(--alto);text-decoration:underline;padding:8px 0;font-size:15px}
+
+/* ---------- Paradero de referencia ---------- */
+.paradas{display:grid;gap:8px}
+.parada{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 12px;align-items:center;text-align:left;padding:9px 12px;min-height:58px;background:var(--papel);border:2px solid var(--linea);border-radius:6px}
+.parada[aria-pressed="true"]{background:var(--senal);border-color:var(--asfalto)}
+.parada .pc{grid-row:1/3;font-family:var(--cond);font-weight:700;font-size:21px;min-width:2.3em}
+.parada .pn{font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+.parada .ps{grid-column:2;font-size:14px;color:var(--gris)}
+.parada[aria-pressed="true"] .ps{color:var(--tinta)}
+.parada .pd{grid-row:1/3;grid-column:3;font-family:var(--cond);font-weight:600;font-size:19px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.otra{width:100%;height:52px;margin-top:8px;border:2px solid var(--linea);border-radius:6px;background:var(--papel);padding:0 10px;font-size:16px}
+.otra:focus{border-color:var(--asfalto);outline:none;box-shadow:0 0 0 3px var(--senal)}
+.nota-parada{font-size:14px;color:var(--gris);margin:8px 0 0}
+.nota-parada.alerta{color:#7A0A1C}
+
+/* ---------- Botón principal fijo ---------- */
+.pie{position:fixed;left:0;right:0;bottom:0;z-index:1001;background:var(--senal);border-top:3px solid var(--asfalto);padding-bottom:env(safe-area-inset-bottom)}
+.pie button{display:block;width:100%;height:64px;border:0;background:none;color:var(--asfalto);font-family:var(--cond);font-weight:700;font-size:24px}
+.pie button:active{background:var(--senal-press)}
+.pie button:disabled{opacity:.65}
+
+/* ---------- Confirmación ---------- */
+.estado-banda{color:#fff;padding:22px 16px 20px}
+.estado-banda.ok{background:var(--ok)} .estado-banda.pend{background:#8A6400}
+.estado-banda h1{font-size:30px}
+.estado-banda p{margin:4px 0 0;opacity:.92}
+.ficha{background:var(--papel);margin:16px 0 0;border-radius:6px;border:1px solid var(--linea)}
+.ficha .grande{padding:14px 16px;border-bottom:1px solid var(--linea)}
+.ficha .grande small{display:block;color:var(--gris);font-size:14px}
+.ficha .grande strong{font-family:var(--cond);font-size:34px;line-height:1.1}
+.ficha dl{margin:0;padding:6px 16px 10px}
+.ficha dl div{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #E4E7EA}
+.ficha dl div:last-child{border-bottom:0}
+.ficha dt{color:var(--gris)} .ficha dd{margin:0;text-align:right;font-weight:500;word-break:break-word}
+.ref{font-size:13px;color:var(--gris);margin:10px 2px 0}
+.btn-wa{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:60px;margin-top:18px;border:0;border-radius:6px;background:var(--wa);color:#fff;font-family:var(--cond);font-weight:700;font-size:22px}
+.btn-linea{display:block;width:100%;height:56px;margin-top:10px;border:2px solid var(--asfalto);border-radius:6px;background:var(--papel);font-weight:600;font-size:17px}
+
+/* ---------- Mis reportes ---------- */
+.lista{list-style:none;margin:16px 0 0;padding:0;background:var(--papel);border:1px solid var(--linea);border-radius:6px}
+.lista li{padding:13px 14px;border-bottom:1px solid #E4E7EA;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.lista li:last-child{border-bottom:0}
+.lista b{font-family:var(--cond);font-weight:600;font-size:19px;display:block}
+.lista small{color:var(--gris);font-size:14px}
+.sello{flex:none;font-size:13px;font-weight:600;padding:4px 8px;border-radius:4px;border:1.5px solid}
+.sello.ABIERTO{color:#7A0A1C;border-color:#E3A1AB;background:#FBE6E9}
+.sello.EN{color:#5B4500;border-color:#E6C55A;background:#FFF3C8}
+.sello.CERRADO{color:#0F4F2B;border-color:#8CC5A3;background:#E3F2E9}
+.sello.PEND{color:var(--gris);border-color:var(--linea);background:#F4F5F6}
+.vacio{padding:28px 16px;text-align:center;color:var(--gris)}
+.cambiar{margin-top:26px;font-size:15px;color:var(--gris)}
+.cambiar button{background:none;border:0;padding:0;color:var(--tinta);text-decoration:underline;font-size:15px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ======================= INGRESO ======================= -->
+<section id="ingreso" hidden>
+  <div class="marca">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2 24 13 13 24 2 13Z" fill="#F2B705" stroke="#fff" stroke-width="1.5"/><path d="M13 8v6.5" stroke="#1E2328" stroke-width="2.6" stroke-linecap="round"/><circle cx="13" cy="18" r="1.5" fill="#1E2328"/></svg>
+    Reporte de fallas en vía
+  </div>
+
+  <div class="ingreso-cuerpo" id="pasoCedula">
+    <h1>Ingrese con su cédula</h1>
+    <p>Solo se pide una vez en este celular.</p>
+    <input id="cedula" class="campo-grande" type="tel" inputmode="numeric" autocomplete="off" placeholder="Número de cédula" aria-label="Número de cédula">
+    <button class="btn-senal" id="btnIngresar">Ingresar</button>
+    <div id="errIngreso" class="error-ingreso" hidden></div>
+  </div>
+
+  <div class="ingreso-cuerpo" id="pasoCelular" hidden>
+    <h1 id="saludo"></h1>
+    <p>Confirme el celular donde lo pueden llamar si reporta una falla.</p>
+    <input id="celIngreso" class="campo-grande" type="tel" inputmode="numeric" placeholder="3001234567" aria-label="Celular">
+    <button class="btn-senal" id="btnContinuar">Continuar</button>
+    <div id="errCelular" class="error-ingreso" hidden></div>
+    <button class="enlace-claro" id="btnNoSoyYo">No soy yo</button>
+  </div>
+</section>
+
+<!-- ======================= APP ======================= -->
+<div id="app" hidden>
+  <header class="barra">
+    <div class="quien"><strong id="nombreBarra"></strong><span id="celBarra"></span></div>
+    <button class="btn-barra" id="btnMisReportes">Mis reportes</button>
+  </header>
+
+  <!-- ---------- Formulario ---------- -->
+  <div id="vistaForm">
+    <div class="mapa-caja">
+      <div id="mapa" aria-label="Mapa de la ubicación de la falla"></div>
+      <div class="gps-chip" id="gpsChip"><i></i><span id="gpsTexto">Buscando GPS</span></div>
+      <button class="btn-centrar" id="btnGps" aria-label="Volver a mi ubicación GPS">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E2328" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.6" fill="#1E2328"/><path d="M12 1.5v3.5M12 19v3.5M1.5 12H5M19 12h3.5"/></svg>
+      </button>
+    </div>
+    <div class="franja"><span id="ahora"></span><b id="coords">—</b></div>
+
+    <main>
+      <div id="msg" class="aviso" hidden></div>
+      <div id="cola" class="aviso info" hidden></div>
+
+      <div class="bloque par">
+        <div><label for="vehiculo">Vehículo</label><input id="vehiculo" class="codigo" list="lstVehiculos" autocomplete="off" inputmode="text"></div>
+        <div><label for="ruta">Ruta</label><input id="ruta" class="codigo" list="lstRutas" autocomplete="off"></div>
+        <datalist id="lstVehiculos"></datalist><datalist id="lstRutas"></datalist>
+      </div>
+
+      <div class="bloque" id="bloqueParadero" hidden>
+        <h2 id="tPar">Paradero más cercano</h2>
+        <div class="paradas" id="paradas" role="group" aria-labelledby="tPar"></div>
+        <select id="otraParada" class="otra" aria-label="Elegir otro paradero de la ruta"></select>
+        <p class="nota-parada" id="notaParada"></p>
+      </div>
+
+      <div class="bloque">
+        <h2 id="tFalla">¿Qué falla tiene?</h2>
+        <div class="tableros" id="fallas" role="group" aria-labelledby="tFalla"></div>
+      </div>
+
+      <div class="bloque">
+        <h2 id="tDet">¿El vehículo quedó detenido?</h2>
+        <div class="dos" id="detenido" role="group" aria-labelledby="tDet">
+          <button type="button" data-v="SÍ" aria-pressed="false">Sí, detenido</button>
+          <button type="button" data-v="NO" aria-pressed="false">No, sigue en ruta</button>
+        </div>
+      </div>
+
+      <details id="masDetalle">
+        <summary>Agregar detalle o foto</summary>
+        <div class="detalle-cuerpo">
+          <textarea id="descripcion" maxlength="1000" aria-label="Detalle de la falla" placeholder="Qué pasó, ruidos, luces encendidas en el tablero…"></textarea>
+          <label class="foto-btn" for="foto">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E2328" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            <span id="fotoTexto">Tomar o adjuntar foto</span>
+          </label>
+          <input id="foto" type="file" accept="image/*">
+          <img id="preview" alt="Foto adjunta" hidden>
+          <button type="button" class="quitar" id="btnQuitarFoto" hidden>Quitar foto</button>
+        </div>
+      </details>
+    </main>
+    <div class="pie"><button id="btnEnviar">Reportar falla</button></div>
+  </div>
+
+  <!-- ---------- Confirmación ---------- -->
+  <div id="vistaListo" hidden>
+    <div class="estado-banda" id="banda"><h1 id="listoTitulo"></h1><p id="listoSub"></p></div>
+    <main>
+      <div class="ficha">
+        <div class="grande"><small>Vehículo</small><strong id="listoVeh"></strong></div>
+        <dl id="listoDatos"></dl>
+      </div>
+      <p class="ref" id="listoId"></p>
+      <button class="btn-wa" id="btnWa">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3a.5.5 0 0 0 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1.1 2.7 11.4 11.4 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3Z"/></svg>
+        Enviar por WhatsApp
+      </button>
+      <button class="btn-linea" id="btnNuevo">Hacer otro reporte</button>
+    </main>
+  </div>
+
+  <!-- ---------- Mis reportes ---------- -->
+  <div id="vistaHist" hidden>
+    <main>
+      <div class="bloque"><h2>Mis últimos reportes</h2></div>
+      <ul class="lista" id="lista"></ul>
+      <button class="btn-linea" id="btnVolver" style="margin-top:16px">Volver al reporte</button>
+      <p class="cambiar">¿No es <span id="nombreCambiar"></span>? <button id="btnSalir">Cambiar de operador</button></p>
+    </main>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+/* =====================================================================
+   CONFIGURACIÓN — solo se edita este bloque
+   ===================================================================== */
+const CONFIG = {
+  API_URL: 'https://script.google.com/macros/s/AKfycbxiytKdDt1UGP5Jl5lg87gb9p9DqtZdVnNlwN62NJUpJ_wReFOKJNTppgaKRZvzZ5EEPA/exec',  // termina en /exec
+  WHATSAPP_NUMERO: '573045749289',      // ej. '573001234567'. Vacío = el operador elige chat o grupo
+  INDICATIVO: '57',
+  MAPA_CENTRO: [10.3910, -75.4794]               // Cartagena
+};
+const FALLAS_DEFECTO = ['Motor','Frenos','Eléctrico / batería','Llantas','Aire acondicionado','Puertas',
+  'Suspensión','Dirección','Caja / embrague','Fuga de aceite, agua o aire','Recalentamiento',
+  'Carrocería / vidrios','Choque','Otra'];
+
+/* ===================================================================== */
+const $ = id => document.getElementById(id);
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+const apiOk = () => /^https:\/\/script\.google(usercontent)?\.com\//.test(CONFIG.API_URL);
+const pad = n => String(n).padStart(2, '0');
+const digitos = s => String(s || '').replace(/\D/g, '');
+const vibrar = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+const celBonito = c => c && c.length === 10 ? `+${CONFIG.INDICATIVO} ${c.slice(0,3)} ${c.slice(3,6)} ${c.slice(6)}` : (c || '');
+const primerNombre = n => String(n || '').split(' ')[0];
+
+let sesion = LS.get('sesion', null);
+let opPendiente = null;
+const estado = { falla: null, detenido: null, pos: null, gps: null, manual: false, foto: null };
+let mapa = null, marcador = null, circulo = null, watchId = null, centrado = false, enviandoCola = false;
+
+async function api(params) {
+  const q = new URLSearchParams(params).toString();
+  const r = await fetch(`${CONFIG.API_URL}?${q}`);
+  return r.json();
+}
+
+/* ============================ INGRESO ============================ */
+function mostrarIngreso() {
+  $('app').hidden = true; $('ingreso').hidden = false;
+  $('pasoCedula').hidden = false; $('pasoCelular').hidden = true;
+  $('errIngreso').hidden = true; $('cedula').value = '';
+  setTimeout(() => $('cedula').focus(), 50);
+}
+function errorIngreso(id, texto) { $(id).textContent = texto; $(id).hidden = false; }
+
+$('cedula').addEventListener('input', e => { e.target.value = digitos(e.target.value).slice(0, 12); });
+$('cedula').addEventListener('keydown', e => { if (e.key === 'Enter') ingresar(); });
+$('btnIngresar').addEventListener('click', ingresar);
+
+async function ingresar() {
+  const ced = digitos($('cedula').value);
+  $('errIngreso').hidden = true;
+  if (ced.length < 5) return errorIngreso('errIngreso', 'Escriba su número de cédula completo, sin puntos.');
+  if (!apiOk()) { // modo prueba
+    opPendiente = { cedula: ced, nombre: 'Operador De Prueba', celular: '' };
+    return pedirCelular();
+  }
+  const b = $('btnIngresar'); b.disabled = true; b.textContent = 'Verificando…';
+  try {
+    const r = await api({ accion: 'operador', cedula: ced });
+    if (r.ok) { opPendiente = { cedula: ced, nombre: r.nombre, celular: r.celular || '' }; pedirCelular(); }
+    else if (r.codigo === 'INACTIVO') errorIngreso('errIngreso', 'Su usuario está inactivo. Comuníquese con mantenimiento.');
+    else errorIngreso('errIngreso', 'Esa cédula no está registrada. Revise el número o comuníquese con mantenimiento.');
+  } catch (e) {
+    errorIngreso('errIngreso', 'Sin conexión. El primer ingreso necesita internet; intente de nuevo con señal.');
+  }
+  b.disabled = false; b.textContent = 'Ingresar';
+}
+function pedirCelular() {
+  $('pasoCedula').hidden = true; $('pasoCelular').hidden = false; $('errCelular').hidden = true;
+  $('saludo').textContent = `Hola, ${primerNombre(opPendiente.nombre)}`;
+  $('celIngreso').value = limpiarCel(opPendiente.celular);
+}
+const limpiarCel = v => { let d = digitos(v); if (d.length > 10 && d.startsWith(CONFIG.INDICATIVO)) d = d.slice(CONFIG.INDICATIVO.length); return d.slice(0, 10); };
+$('celIngreso').addEventListener('input', e => { e.target.value = limpiarCel(e.target.value); });
+$('btnContinuar').addEventListener('click', () => {
+  const cel = digitos($('celIngreso').value);
+  if (!/^3\d{9}$/.test(cel)) return errorIngreso('errCelular', 'Escriba un celular de 10 dígitos que empiece por 3.');
+  sesion = { cedula: opPendiente.cedula, nombre: opPendiente.nombre, celular: cel };
+  LS.set('sesion', sesion);
+  entrarApp();
+});
+$('btnNoSoyYo').addEventListener('click', mostrarIngreso);
+$('btnSalir').addEventListener('click', () => {
+  if (!confirm(`¿Salir de la cuenta de ${sesion.nombre}?`)) return;
+  LS.del('sesion'); LS.del('ultimo'); sesion = null; mostrarIngreso();
+});
+
+async function verificarSesion() { // revalida en silencio por si lo desactivaron
+  if (!apiOk() || !navigator.onLine) return;
+  try {
+    const r = await api({ accion: 'operador', cedula: sesion.cedula });
+    if (r.ok && r.nombre && r.nombre !== sesion.nombre) { sesion.nombre = r.nombre; LS.set('sesion', sesion); pintarBarra(); }
+    if (!r.ok && (r.codigo === 'NO_REGISTRADO' || r.codigo === 'INACTIVO')) { LS.del('sesion'); sesion = null; mostrarIngreso(); }
+  } catch (e) {}
+}
+
+/* ============================ APP ============================ */
+function pintarBarra() {
+  $('nombreBarra').textContent = sesion.nombre;
+  $('celBarra').textContent = celBonito(sesion.celular);
+  $('nombreCambiar').textContent = primerNombre(sesion.nombre);
+}
+function entrarApp() {
+  $('ingreso').hidden = true; $('app').hidden = false;
+  pintarBarra(); verVista('vistaForm');
+  const u = LS.get('ultimo', {});
+  $('vehiculo').value = u.vehiculo || ''; $('ruta').value = u.ruta || '';
+  if (!mapa) iniciarMapa(); else setTimeout(() => mapa.invalidateSize(), 50);
+  iniciarGps(); cargarListas(); cargarParaderos(); procesarCola(); verificarSesion();
+  if (!apiOk()) aviso('Modo prueba: falta configurar API_URL. Los reportes quedan guardados en este celular.', 'info');
+}
+function verVista(id) {
+  ['vistaForm', 'vistaListo', 'vistaHist'].forEach(v => $(v).hidden = v !== id);
+  $('btnMisReportes').hidden = id === 'vistaHist';
+  scrollTo(0, 0);
+  if (id === 'vistaForm' && mapa) setTimeout(() => mapa.invalidateSize(), 50);
+}
+function aviso(texto, tipo) { const el = $('msg'); el.className = 'aviso ' + tipo; el.textContent = texto; el.hidden = false; }
+function quitarAviso() { $('msg').hidden = true; }
+
+/* ---------- Reloj ---------- */
+const fmtAhora = new Intl.DateTimeFormat('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+function tic() { $('ahora').textContent = fmtAhora.format(new Date()); }
+setInterval(tic, 15000); tic();
+
+/* ---------- Mapa ---------- */
+function iniciarMapa() {
+  if (typeof L === 'undefined') { $('mapa').style.display = 'none'; return; }
+  mapa = L.map('mapa', { zoomControl: false, attributionControl: true }).setView(CONFIG.MAPA_CENTRO, 13);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
+  const icono = L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [3, 30] });
+  marcador = L.marker(CONFIG.MAPA_CENTRO, { draggable: true, icon: icono, keyboard: false });
+  marcador.on('dragend', () => fijarManual(marcador.getLatLng()));
+  mapa.on('click', e => fijarManual(e.latlng));
+}
+function colocar(lat, lng) {
+  if (!mapa) return;
+  if (!mapa.hasLayer(marcador)) marcador.addTo(mapa);
+  marcador.setLatLng([lat, lng]);
+}
+function fijarManual(ll) {
+  estado.manual = true; estado.pos = { lat: ll.lat, lng: ll.lng };
+  par.manual = false;   // el punto cambió: se vuelve a buscar el paradero más cercano
+  colocar(ll.lat, ll.lng);
+  if (circulo) { mapa.removeLayer(circulo); circulo = null; }
+  pintarGps();
+}
+
+/* ---------- GPS ---------- */
+function iniciarGps() {
+  if (!('geolocation' in navigator)) { chip('mal', 'Sin GPS: toque el mapa'); return; }
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  estado.manual = false; centrado = false;
+  chip('', 'Buscando GPS');
+  watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+}
+function onPos(p) {
+  const c = p.coords;
+  estado.gps = { lat: c.latitude, lng: c.longitude, precision: c.accuracy };
+  if (!estado.manual) {
+    estado.pos = { lat: c.latitude, lng: c.longitude };
+    colocar(c.latitude, c.longitude);
+    if (mapa) {
+      if (!circulo) circulo = L.circle([c.latitude, c.longitude], { radius: c.accuracy, color: '#1E2328', weight: 1, fillColor: '#F2B705', fillOpacity: .18 }).addTo(mapa);
+      else circulo.setLatLng([c.latitude, c.longitude]).setRadius(c.accuracy);
+      if (!centrado) { mapa.setView([c.latitude, c.longitude], 17); centrado = true; }
+    }
+  }
+  pintarGps();
+}
+function onErr(err) {
+  if (estado.pos) return;
+  chip('mal', err.code === 1 ? 'Ubicación bloqueada: toque el mapa' : 'Sin señal GPS: toque el mapa');
+}
+function chip(clase, texto) { $('gpsChip').className = 'gps-chip ' + clase; $('gpsTexto').textContent = texto; }
+function pintarGps() {
+  if (estado.pos) $('coords').textContent = `${estado.pos.lat.toFixed(5)}, ${estado.pos.lng.toFixed(5)}`;
+  actualizarParadero(false);
+  if (estado.manual) chip('regular', 'Punto marcado a mano');
+  else if (estado.gps) {
+    const a = Math.round(estado.gps.precision);
+    chip(a <= 25 ? 'bien' : a <= 80 ? 'regular' : 'mal', `GPS ±${a} m`);
+  }
+}
+$('btnGps').addEventListener('click', iniciarGps);
+
+/* ---------- Listas ---------- */
+function pintarListas(l) {
+  const ops = arr => (arr || []).map(v => Object.assign(document.createElement('option'), { value: v }));
+  $('lstVehiculos').replaceChildren(...ops(l.vehiculos));
+  $('lstRutas').replaceChildren(...ops(l.rutas));
+  const fallas = l.fallas && l.fallas.length ? l.fallas : FALLAS_DEFECTO;
+  $('fallas').replaceChildren(...fallas.map(f => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tablero'; b.textContent = f; b.dataset.v = f;
+    b.setAttribute('aria-pressed', estado.falla === f ? 'true' : 'false');
+    return b;
+  }));
+}
+async function cargarListas() {
+  pintarListas(LS.get('listas', {}));
+  if (!apiOk()) return;
+  try {
+    const r = await api({ accion: 'listas' });
+    if (r.ok) { const l = { vehiculos: r.vehiculos, rutas: r.rutas, fallas: r.fallas }; LS.set('listas', l); pintarListas(l); }
+  } catch (e) {}
+}
+function marcar(grupo, b) { [...$(grupo).children].forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); }
+const esOtra = f => /^otr[ao]s?$/i.test(String(f || '').trim());
+$('fallas').addEventListener('click', e => {
+  const b = e.target.closest('.tablero'); if (!b) return;
+  estado.falla = b.dataset.v; marcar('fallas', b); vibrar(15); quitarAviso();
+  if (esOtra(estado.falla)) { $('masDetalle').open = true; }
+});
+$('detenido').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  estado.detenido = b.dataset.v; marcar('detenido', b); vibrar(15); quitarAviso();
+});
+
+/* ---------- Paraderos por ruta ---------- */
+let PARADEROS = [];   // {g: Gid, r: ruta, p: código P01, u: ubicación, s: sentido, lat, lng}
+const par = { sel: null, manual: false, capa: null, marcas: new Map(), rutaPintada: null, ultimo: null };
+const normRuta = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const sentidoTxt = s => ({ IDA: 'Ida', VUELTA: 'Vuelta', CIRCULAR: 'Circular' }[String(s || '').toUpperCase()] || s || '');
+const metros = d => d < 1000 ? `${Math.round(d)} m` : `${(d / 1000).toFixed(1)} km`;
+function distM(a, b, c, d) {
+  const k = Math.PI / 180, x = (d - b) * k * Math.cos((a + c) / 2 * k), y = (c - a) * k;
+  return Math.sqrt(x * x + y * y) * 6371000;
+}
+const desempacar = filas => (filas || []).map(([g, r, p, u, s, lat, lng]) => ({ g, r, p, u, s, lat: +lat, lng: +lng }));
+
+async function cargarParaderos() {
+  const c = LS.get('paraderos', null);
+  if (c && c.filas) { PARADEROS = desempacar(c.filas); actualizarParadero(true); }
+  try {
+    let r = null;
+    if (apiOk()) { try { r = await api({ accion: 'paraderos', v: c ? c.version : '' }); } catch (e) {} }
+    if (r && r.ok && r.sinCambios) return;
+    if (!(r && r.ok && r.paraderos && r.paraderos.length)) {   // respaldo: paraderos.json junto a la página
+      const f = await fetch('paraderos.json', { cache: 'no-cache' });
+      if (f.ok) r = await f.json();
+      if (c && r && r.version === c.version) return;
+    }
+    if (r && r.paraderos && r.paraderos.length) {
+      LS.set('paraderos', { version: r.version || '', filas: r.paraderos });
+      PARADEROS = desempacar(r.paraderos); par.rutaPintada = null; actualizarParadero(true);
+    }
+  } catch (e) {}
+}
+const paraderosDeRuta = () => { const r = normRuta($('ruta').value); return r ? PARADEROS.filter(x => normRuta(x.r) === r) : []; };
+
+function pintarParaderosMapa(lista) {
+  if (!mapa || typeof L === 'undefined') return;
+  const clave = normRuta($('ruta').value);
+  if (par.rutaPintada !== clave) {
+    if (par.capa) mapa.removeLayer(par.capa);
+    par.capa = L.layerGroup().addTo(mapa); par.marcas.clear();
+    lista.forEach(x => {
+      const m = L.circleMarker([x.lat, x.lng], { radius: 6, color: '#1E2328', weight: 2, fillColor: '#FFFFFF', fillOpacity: 1, bubblingMouseEvents: false })
+        .bindTooltip(`${x.p} · ${x.u} (${sentidoTxt(x.s)})`, { direction: 'top', offset: [0, -6] })
+        .on('click', () => elegirParadero(x.g));
+      m.addTo(par.capa); par.marcas.set(x.g, m);
+    });
+    par.rutaPintada = clave;
+  }
+  // El elegido siempre visible y resaltado (aunque la ruta no tenga paraderos cargados)
+  par.marcas.forEach((m, g) => m.setStyle(par.sel && g === par.sel.g ? { radius: 9, fillColor: '#F2B705', weight: 3 } : { radius: 6, fillColor: '#FFFFFF', weight: 2 }));
+  if (par.sel && !par.marcas.has(par.sel.g)) {
+    const m = L.circleMarker([par.sel.lat, par.sel.lng], { radius: 9, color: '#1E2328', weight: 3, fillColor: '#F2B705', fillOpacity: 1, bubblingMouseEvents: false })
+      .bindTooltip(`${par.sel.r} ${par.sel.p} · ${par.sel.u}`, { direction: 'top', offset: [0, -8] });
+    if (par.extra) par.capa.removeLayer(par.extra);
+    par.extra = m.addTo(par.capa);
+  } else if (par.extra) { par.capa.removeLayer(par.extra); par.extra = null; }
+  if (par.sel && par.marcas.has(par.sel.g)) par.marcas.get(par.sel.g).bringToFront();
+}
+
+function actualizarParadero(forzar) {
+  const blq = $('bloqueParadero');
+  if (!PARADEROS.length) { blq.hidden = true; return; }
+  const deRuta = paraderosDeRuta();
+  if (!estado.pos) {
+    blq.hidden = !deRuta.length; par.sel = null;
+    $('paradas').replaceChildren(); $('otraParada').hidden = true;
+    $('notaParada').className = 'nota-parada'; $('notaParada').textContent = 'Esperando la ubicación para buscar el paradero más cercano.';
+    pintarParaderosMapa(deRuta); return;
+  }
+  // Con GPS en movimiento solo se recalcula si el punto se movió más de 10 m
+  const p = estado.pos;
+  if (!forzar && par.ultimo && par.ultimo.ruta === normRuta($('ruta').value) && distM(p.lat, p.lng, par.ultimo.lat, par.ultimo.lng) < 10) return;
+  par.ultimo = { lat: p.lat, lng: p.lng, ruta: normRuta($('ruta').value) };
+
+  const base = deRuta.length ? deRuta : PARADEROS;
+  const cerca = base.map(x => Object.assign({}, x, { d: distM(p.lat, p.lng, x.lat, x.lng) })).sort((a, b) => a.d - b.d);
+  if (par.manual && par.sel && base.some(x => x.g === par.sel.g)) par.sel = cerca.find(x => x.g === par.sel.g);
+  else { par.manual = false; par.sel = cerca[0]; }
+
+  const top = cerca.slice(0, 3);
+  if (!top.some(x => x.g === par.sel.g)) top.push(par.sel);
+  $('paradas').replaceChildren(...top.map(x => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'parada'; b.dataset.g = x.g;
+    b.setAttribute('aria-pressed', x.g === par.sel.g ? 'true' : 'false');
+    b.append(
+      Object.assign(document.createElement('span'), { className: 'pc', textContent: x.p }),
+      Object.assign(document.createElement('span'), { className: 'pn', textContent: x.u }),
+      Object.assign(document.createElement('span'), { className: 'ps', textContent: (deRuta.length ? '' : `Ruta ${x.r} · `) + sentidoTxt(x.s) }),
+      Object.assign(document.createElement('span'), { className: 'pd', textContent: metros(x.d) }));
+    return b;
+  }));
+
+  // Lista completa de la ruta, en orden del recorrido y separada por sentido
+  const sel = $('otraParada');
+  if (deRuta.length) {
+    const grupos = {};
+    deRuta.forEach(x => { (grupos[x.s] = grupos[x.s] || []).push(x); });
+    const opts = [Object.assign(document.createElement('option'), { value: '', textContent: 'Elegir otro paradero de la ruta…' })];
+    Object.keys(grupos).forEach(k => {
+      const og = document.createElement('optgroup'); og.label = sentidoTxt(k);
+      grupos[k].forEach(x => og.append(Object.assign(document.createElement('option'), { value: x.g, textContent: `${x.p} · ${x.u}` })));
+      opts.push(og);
+    });
+    sel.replaceChildren(...opts); sel.value = ''; sel.hidden = false;
+  } else sel.hidden = true;
+
+  const nota = $('notaParada'); nota.className = 'nota-parada';
+  if (!deRuta.length) {
+    nota.textContent = $('ruta').value.trim()
+      ? `La ruta ${$('ruta').value.trim().toUpperCase()} no tiene paraderos cargados. Se muestran los más cercanos de cualquier ruta.`
+      : 'Escriba la ruta para ver solo sus paraderos.';
+  } else if (par.sel.d > 500) {
+    nota.className = 'nota-parada alerta';
+    nota.textContent = `El punto está a ${metros(par.sel.d)} del paradero más cercano de la ruta ${deRuta[0].r}. Revise la ruta o el punto en el mapa.`;
+  } else nota.textContent = par.manual ? 'Paradero elegido por usted.' : 'Elegido solo por cercanía. Toque otro si no es el correcto.';
+  blq.hidden = false;
+  pintarParaderosMapa(deRuta);
+}
+function elegirParadero(g) {
+  const x = PARADEROS.find(y => String(y.g) === String(g)); if (!x) return;
+  par.sel = x; par.manual = true; vibrar(15); actualizarParadero(true);
+}
+$('paradas').addEventListener('click', e => { const b = e.target.closest('.parada'); if (b) elegirParadero(b.dataset.g); });
+$('otraParada').addEventListener('change', e => { if (e.target.value) elegirParadero(e.target.value); });
+$('ruta').addEventListener('input', () => { par.manual = false; actualizarParadero(true); });
+function paraderoParaReporte() {
+  if (!par.sel || !estado.pos) return {};
+  const x = par.sel, d = distM(estado.pos.lat, estado.pos.lng, x.lat, x.lng);
+  return { paraderoGid: x.g, paraderoCodigo: x.p, paraderoNombre: x.u, paraderoSentido: sentidoTxt(x.s), paraderoRuta: x.r,
+           paraderoDist: Math.round(d), paraderoEleccion: par.manual ? 'Operador' : 'Automático' };
+}
+
+/* ---------- Foto ---------- */
+function comprimir(file, max, calidad) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url); res(cv.toDataURL('image/jpeg', calidad));
+    };
+    img.onerror = rej; img.src = url;
+  });
+}
+function limpiarFoto() {
+  estado.foto = null; $('foto').value = ''; $('preview').hidden = true; $('btnQuitarFoto').hidden = true;
+  $('fotoTexto').textContent = 'Tomar o adjuntar foto';
+}
+$('foto').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return limpiarFoto();
+  try {
+    estado.foto = await comprimir(f, 1280, 0.7);
+    $('preview').src = estado.foto; $('preview').hidden = false; $('btnQuitarFoto').hidden = false;
+    $('fotoTexto').textContent = 'Cambiar foto';
+  } catch (err) { limpiarFoto(); aviso('No se pudo leer la foto. Puede reportar sin ella.', 'err'); }
+});
+$('btnQuitarFoto').addEventListener('click', limpiarFoto);
+
+/* ---------- Envío ---------- */
+function generarId() {
+  const d = new Date(), r = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `F-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${r}`;
+}
+const num = (v, dec) => (v == null || isNaN(v)) ? null : +Number(v).toFixed(dec);
+
+async function subir(rep) {
+  if (!apiOk()) return { ok: false, error: 'API no configurada' };
+  try {
+    const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 30000);
+    const r = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(rep), signal: ctrl.signal });
+    clearTimeout(t); return await r.json();
+  } catch (e) { return { ok: false, error: String(e) }; }
+}
+
+async function enviar() {
+  quitarAviso();
+  const veh = $('vehiculo').value.trim().toUpperCase(), ruta = $('ruta').value.trim().toUpperCase();
+  const desc = $('descripcion').value.trim();
+  const falta = [];
+  if (!estado.pos) falta.push('la ubicación (espere el GPS o toque el mapa)');
+  if (!veh) falta.push('el vehículo');
+  if (!ruta) falta.push('la ruta');
+  if (!estado.falla) falta.push('qué falla tiene');
+  if (!estado.detenido) falta.push('si quedó detenido');
+  if (esOtra(estado.falla) && !desc) { falta.push('el detalle de la falla'); $('masDetalle').open = true; }
+  if (falta.length) { aviso('Falta ' + falta.join(', ') + '.', 'err'); vibrar([40, 60, 40]); $('msg').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+
+  LS.set('ultimo', { vehiculo: veh, ruta });
+  const d = new Date();
+  const rep = {
+    id: generarId(), fechaHoraISO: d.toISOString(),
+    fecha: `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`, hora: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    cedula: sesion.cedula, nombre: sesion.nombre, celular: sesion.celular,
+    vehiculo: veh, ruta, falla: estado.falla, detenido: estado.detenido, descripcion: desc,
+    lat: num(estado.pos.lat, 6), lng: num(estado.pos.lng, 6),
+    precision: estado.manual ? null : num(estado.gps && estado.gps.precision, 0), manual: estado.manual,
+    foto: estado.foto, dispositivo: navigator.userAgent.slice(0, 200),
+    ...paraderoParaReporte()
+  };
+  const b = $('btnEnviar'); b.disabled = true; b.textContent = 'Enviando…';
+  const r = await subir(rep);
+  b.disabled = false; b.textContent = 'Reportar falla';
+  if (r.codigo === 'NO_AUTORIZADO') { LS.del('sesion'); sesion = null; mostrarIngreso(); errorIngreso('errIngreso', 'Su usuario no está autorizado. Comuníquese con mantenimiento.'); return; }
+  if (r.ok) { rep.fotoUrl = r.foto || ''; guardarPropio(rep, true); mostrarListo(rep, true); }
+  else { encolar(rep); guardarPropio(rep, false); mostrarListo(rep, false); }
+  vibrar(80);
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+$('btnEnviar').addEventListener('click', enviar);
+
+function guardarPropio(rep, enviado) { // historial local, por si no hay señal al consultar
+  const h = LS.get('propios', []).filter(x => x.id !== rep.id);
+  h.unshift({ id: rep.id, fecha: rep.fecha, hora: rep.hora, vehiculo: rep.vehiculo, falla: rep.falla, enviado });
+  LS.set('propios', h.slice(0, 15));
+}
+
+/* ---------- Cola sin señal ---------- */
+function encolar(rep) {
+  const c = LS.get('cola', []); c.push(rep);
+  if (!LS.set('cola', c)) { rep.foto = null; c[c.length - 1] = rep; LS.set('cola', c); }
+  pintarCola();
+}
+async function procesarCola() {
+  if (enviandoCola || !sesion) return;
+  const c = LS.get('cola', []);
+  if (!c.length || !navigator.onLine || !apiOk()) { pintarCola(); return; }
+  enviandoCola = true;
+  const pend = [];
+  for (const rep of c) {
+    const r = await subir(rep);
+    if (r.ok) guardarPropio(rep, true);
+    else if (r.codigo !== 'NO_AUTORIZADO') pend.push(rep);
+  }
+  LS.set('cola', pend); enviandoCola = false; pintarCola();
+}
+function pintarCola() {
+  const n = LS.get('cola', []).length, el = $('cola');
+  el.hidden = !n;
+  if (n) el.textContent = n === 1 ? 'Hay 1 reporte guardado sin enviar. Se envía solo cuando vuelva la señal.'
+                                  : `Hay ${n} reportes guardados sin enviar. Se envían solos cuando vuelva la señal.`;
+}
+addEventListener('online', procesarCola);
+setInterval(procesarCola, 60000);
+
+/* ---------- WhatsApp ---------- */
+function textoWhatsApp(r) {
+  return [
+    `*Falla en vía – Vehículo ${r.vehiculo}*`,
+    `Ruta: ${r.ruta}`,
+    `Falla: *${r.falla}*`,
+    `Detenido: *${r.detenido}*`,
+    r.descripcion ? `Detalle: ${r.descripcion}` : null,
+    ``,
+    `Operador: ${r.nombre}`,
+    `Celular: ${celBonito(r.celular)}`,
+    `Fecha: ${r.fecha}  ${r.hora}`,
+    ``,
+    r.paraderoCodigo ? `Cerca de: *${r.paraderoCodigo} ${r.paraderoNombre}*` + (r.paraderoRuta && normRuta(r.paraderoRuta) !== normRuta(r.ruta) ? ` (ruta ${r.paraderoRuta})` : '') + ` – ${r.paraderoSentido}, a ${metros(r.paraderoDist)}` : null,
+    `Ubicación: https://maps.google.com/?q=${r.lat},${r.lng}`,
+    `Latitud: ${r.lat}  Longitud: ${r.lng}` + (r.manual ? ' (marcado a mano)' : (r.precision != null ? ` (±${r.precision} m)` : '')),
+    r.fotoUrl ? `Foto: ${r.fotoUrl}` : null,
+    `Reporte ${r.id}`
+  ].filter(x => x !== null).join('\n');
+}
+function abrirWhatsApp(r) {
+  const t = encodeURIComponent(textoWhatsApp(r));
+  const n = digitos(CONFIG.WHATSAPP_NUMERO);
+  location.href = n ? `https://wa.me/${n}?text=${t}` : `https://wa.me/?text=${t}`;
+}
+
+/* ---------- Confirmación ---------- */
+function mostrarListo(r, enviado) {
+  $('banda').className = 'estado-banda ' + (enviado ? 'ok' : 'pend');
+  $('listoTitulo').textContent = enviado ? 'Reporte enviado' : 'Reporte guardado sin señal';
+  $('listoSub').textContent = enviado ? 'Mantenimiento ya lo tiene. Avise también por WhatsApp.'
+                                      : 'Se envía solo cuando vuelva la señal. Avise por WhatsApp si puede.';
+  $('listoVeh').textContent = r.vehiculo;
+  const filas = [['Ruta', r.ruta], ['Falla', r.falla], ['Detenido', r.detenido], ['Hora', `${r.fecha} ${r.hora}`],
+                 ...(r.paraderoCodigo ? [['Paradero', `${r.paraderoCodigo} ${r.paraderoNombre} (${r.paraderoSentido}), a ${metros(r.paraderoDist)}`]] : []),
+                 ['Ubicación', `${r.lat}, ${r.lng}`], ['Foto', r.foto ? 'Adjunta' : 'Sin foto']];
+  $('listoDatos').replaceChildren(...filas.map(([k, v]) => {
+    const div = document.createElement('div');
+    div.append(Object.assign(document.createElement('dt'), { textContent: k }), Object.assign(document.createElement('dd'), { textContent: v }));
+    return div;
+  }));
+  $('listoId').textContent = 'Número de reporte ' + r.id;
+  $('btnWa').onclick = () => abrirWhatsApp(r);
+  verVista('vistaListo'); pintarCola();
+}
+$('btnNuevo').addEventListener('click', () => {
+  estado.falla = null; estado.detenido = null;
+  document.querySelectorAll('[aria-pressed="true"]').forEach(x => x.setAttribute('aria-pressed', 'false'));
+  $('descripcion').value = ''; limpiarFoto(); $('masDetalle').open = false;
+  par.manual = false; par.ultimo = null;
+  quitarAviso(); verVista('vistaForm'); iniciarGps();
+});
+
+/* ---------- Mis reportes ---------- */
+function filaLista(t, sub, estadoTxt, clase) {
+  const li = document.createElement('li'), izq = document.createElement('div');
+  izq.append(Object.assign(document.createElement('b'), { textContent: t }), Object.assign(document.createElement('small'), { textContent: sub }));
+  li.append(izq, Object.assign(document.createElement('span'), { className: 'sello ' + clase, textContent: estadoTxt }));
+  return li;
+}
+async function verHistorial() {
+  verVista('vistaHist');
+  const ul = $('lista');
+  const pintar = remotos => {
+    const items = [];
+    LS.get('cola', []).forEach(r => items.push(filaLista(`${r.vehiculo}, ${r.falla}`,`${r.fecha} ${r.hora}`, 'Sin enviar', 'PEND')));
+    (remotos || []).forEach(r => {
+      const est = (r.estado || 'ABIERTO').toUpperCase();
+      const txt = est === 'EN ATENCIÓN' ? 'En atención' : est === 'CERRADO' ? 'Atendido' : 'Abierto';
+      items.push(filaLista(`${r.vehiculo}, ${r.falla}`, `${r.fecha} ${r.hora}`.trim() + (r.paradero ? `. Cerca de ${r.paradero}` : '') + (r.responsable ? `. Atiende: ${r.responsable}` : ''), txt, est.split(' ')[0]));
+    });
+    if (!items.length) items.push(Object.assign(document.createElement('li'), { className: 'vacio', textContent: 'Aún no ha reportado fallas desde este celular.' }));
+    ul.replaceChildren(...items);
+  };
+  // Primero lo local, luego lo del servidor con el estado real
+  const locales = LS.get('propios', []).filter(x => x.enviado).map(x => ({ ...x, estado: 'ABIERTO' }));
+  pintar(locales);
+  if (!apiOk()) return;
+  try { const r = await api({ accion: 'misreportes', cedula: sesion.cedula }); if (r.ok) pintar(r.reportes); } catch (e) {}
+}
+$('btnMisReportes').addEventListener('click', verHistorial);
+$('btnVolver').addEventListener('click', () => verVista('vistaForm'));
+
+/* ---------- Inicio ---------- */
+if (sesion && sesion.cedula) entrarApp(); else mostrarIngreso();
+</script>
+</body>
+</html>
