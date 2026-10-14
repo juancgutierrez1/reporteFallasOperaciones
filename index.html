@@ -721,13 +721,13 @@ setInterval(procesarCola, 60000);
 
 /* ---------- WhatsApp ---------- */
 /* Mensaje corto, estilo radio:
-   TC33037 RUTA T101 EN PATIO PORTAL PRESENTA PROBLEMAS EN LA PUERTA 2 OP CARLOS CORBY
+   TC33037 RUTA T101 EN PATIO PORTAL PRESENTA PROBLEMAS EN LA PUERTA 2 OP CARLOS CORBY CEL +57 300 123 4567
    https://maps.google.com/?q=10.39502,-75.47237 */
 const MAY = t => String(t || '').toLocaleUpperCase('es-CO').replace(/\s+/g, ' ').trim();
 function textoWhatsApp(r) {
   const nov = MAY(r.descripcion).replace(/[.\s]+$/, '');
   const donde = r.paraderoNombre ? `EN ${MAY(r.paraderoNombre)}` : '';
-  const linea = [MAY(r.vehiculo), r.ruta ? `RUTA ${MAY(r.ruta)}` : '', donde, nov, `OP ${MAY(r.nombre)}`].filter(Boolean).join(' ');
+  const linea = [MAY(r.vehiculo), r.ruta ? `RUTA ${MAY(r.ruta)}` : '', donde, nov, `OP ${MAY(r.nombre)}`, r.celular ? `CEL ${celBonito(r.celular)}` : ''].filter(Boolean).join(' ');
   const lat = Number(r.lat).toFixed(5), lng = Number(r.lng).toFixed(5);
   return `${linea}\nhttps://maps.google.com/?q=${lat},${lng}`;
 }
